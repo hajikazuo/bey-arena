@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Minhas Finanças | Controle financeiro",
-  description: "Organize suas receitas, despesas e evolução financeira em um só lugar.",
+  title: "Bey Arena | Torneios e Rankings",
+  description: "Gerencie suas partidas de forma simples.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

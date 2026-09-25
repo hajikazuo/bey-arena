@@ -11,6 +11,15 @@ export type CriarTorneioState = {
   success: boolean;
 };
 
+async function obterUsuario() {
+  const supabase = await createClient();
+  const {
+    data: { user: usuario },
+  } = await supabase.auth.getUser();
+
+  return { supabase, usuario };
+}
+
 function lerInteiro(formData: FormData, campo: string): number | null {
   const valor = Number(formData.get(campo));
   return Number.isInteger(valor) ? valor : null;
@@ -76,5 +85,129 @@ export async function criarTorneio(_previousState: CriarTorneioState, formData: 
   }
 
   revalidatePath("/torneios");
+  return { error: null, success: true };
+}
+
+export async function adicionarParticipantes(
+  _previousState: CriarTorneioState,
+  formData: FormData,
+): Promise<CriarTorneioState> {
+  const torneioId = String(formData.get("torneioId") ?? "").trim();
+  const usuarioIds = formData
+    .getAll("usuarioId")
+    .map((valor) => String(valor).trim())
+    .filter(Boolean);
+
+  if (!torneioId) {
+    return { error: "Torneio inválido.", success: false };
+  }
+
+  if (usuarioIds.length === 0) {
+    return { error: "Selecione pelo menos um participante.", success: false };
+  }
+
+  const { supabase, usuario } = await obterUsuario();
+
+  if (!usuario) {
+    return {
+      error: "Sua sessão expirou. Entre novamente para adicionar participantes.",
+      success: false,
+    };
+  }
+
+  const { data: torneio, error: erroTorneio } = await supabase
+    .from("torneios")
+    .select("id, grupo_id, criado_por, status")
+    .eq("id", torneioId)
+    .maybeSingle();
+
+  if (erroTorneio || !torneio) {
+    return { error: "Torneio não encontrado.", success: false };
+  }
+
+  if (torneio.criado_por !== usuario.id) {
+    return {
+      error: "Somente o dono do torneio pode adicionar participantes.",
+      success: false,
+    };
+  }
+
+  if (torneio.status !== "rascunho" && torneio.status !== "inscricoes") {
+    return {
+      error: "Não é possível adicionar participantes neste status do torneio.",
+      success: false,
+    };
+  }
+
+  const { data: membros, error: erroMembros } = await supabase
+    .from("membros_grupos")
+    .select("usuario_id")
+    .eq("grupo_id", torneio.grupo_id)
+    .in("usuario_id", usuarioIds);
+
+  if (erroMembros) {
+    return { error: "Não foi possível validar os membros selecionados.", success: false };
+  }
+
+  const membrosValidos = new Set(
+    (membros ?? []).map((membro: { usuario_id: string }) => membro.usuario_id),
+  );
+  const usuarioForaDoGrupo = usuarioIds.some((usuarioId) => !membrosValidos.has(usuarioId));
+
+  if (usuarioForaDoGrupo) {
+    return {
+      error: "Todos os participantes precisam ser membros do grupo do torneio.",
+      success: false,
+    };
+  }
+
+  const participantes = usuarioIds.map((usuarioId) => {
+    const valorSeed = String(formData.get(`cabecaDeChave_${usuarioId}`) ?? "").trim();
+    const cabecaDeChave = valorSeed ? Number(valorSeed) : null;
+
+    return {
+      torneio_id: torneioId,
+      usuario_id: usuarioId,
+      cabeca_de_chave: cabecaDeChave,
+    };
+  });
+
+  const possuiSeedInvalida = participantes.some(
+    (participante) =>
+      participante.cabeca_de_chave !== null &&
+      (!Number.isInteger(participante.cabeca_de_chave) || participante.cabeca_de_chave <= 0),
+  );
+
+  if (possuiSeedInvalida) {
+    return {
+      error: "As cabeças de chave devem ser números inteiros maiores que zero.",
+      success: false,
+    };
+  }
+
+  const seeds = participantes
+    .map((participante) => participante.cabeca_de_chave)
+    .filter((seed): seed is number => seed !== null);
+
+  if (new Set(seeds).size !== seeds.length) {
+    return { error: "Não é possível repetir uma cabeça de chave.", success: false };
+  }
+
+  const { error } = await supabase.from("participantes_torneios").insert(participantes);
+
+  if (error) {
+    console.error("Erro ao adicionar participantes:", error);
+
+    return {
+      error:
+        error.code === "23505"
+          ? "Um dos participantes selecionados já está inscrito no torneio."
+          : "Não foi possível adicionar os participantes.",
+      success: false,
+    };
+  }
+
+  revalidatePath(`/torneios/${torneioId}`);
+
   return { error: null, success: true };
 }

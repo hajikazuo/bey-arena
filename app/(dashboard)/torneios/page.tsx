@@ -7,6 +7,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -80,7 +81,7 @@ export default async function TorneiosPage() {
               <Card key={torneio.id}>
                 <CardHeader>
                   <CardTitle className="flex items-start justify-between gap-3">
-                    <span>{torneio.nome}</span>
+                    {torneio.nome}
                     <span className="rounded-full bg-muted px-2 py-1 text-xs font-normal text-muted-foreground">
                       {statusLabels[torneio.status]}
                     </span>
@@ -105,6 +106,11 @@ export default async function TorneiosPage() {
                     </span>
                   </div>
                 </CardContent>
+                <CardFooter className="flex-col gap-2">
+                  <Button nativeButton={false} className="w-full" render={<a href={`/torneios/${torneio.id}`} />}>
+                    Participantes
+                  </Button>
+                </CardFooter>
               </Card>
             ))}
           </div>
