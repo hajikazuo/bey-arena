@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { criarPerfilInicial } from "@/lib/domain/usuario";
+import { criarPerfilInicial } from "@/lib/infrastructure/supabase/perfilRepository";
 
 export type SignupState = {
   error: string | null;

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { criarPerfilInicial } from "@/lib/domain/usuario";
+import { criarPerfilInicial } from "@/lib/infrastructure/supabase/perfilRepository";
 
 export type LoginState = {
   error: string | null;

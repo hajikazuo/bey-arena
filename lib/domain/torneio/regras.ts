@@ -1,15 +1,9 @@
 import type { RegrasTorneio } from "@/types/torneio";
 import type { TipoFinalizacao } from "@/types/batalha";
-
-export class RegraDeNegocioError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RegraDeNegocioError";
-  }
-}
+import { RegraDeNegocioError } from "../errors";
 
 export function validarRegrasTorneio(regras: RegrasTorneio): void {
-  if (!Number.isInteger(regras.pontosParaVencer) || regras.pontosParaVencer <= 0) {
+  if (!Number.isInteger(regras.pontosParaVencer) || !Number.isFinite(regras.pontosParaVencer) || regras.pontosParaVencer <= 0) {
     throw new RegraDeNegocioError("A pontuação para vencer deve ser maior que zero.");
   }
 
@@ -20,7 +14,7 @@ export function validarRegrasTorneio(regras: RegrasTorneio): void {
     regras.pontosExtremeFinish,
   ];
 
-  if (pontuacoes.some((pontuacao) => !Number.isInteger(pontuacao) || pontuacao < 0)) {
+  if (pontuacoes.some((pontuacao) => !Number.isInteger(pontuacao) || !Number.isFinite(pontuacao) || pontuacao < 0)) {
     throw new RegraDeNegocioError("As pontuações de finalização não podem ser negativas.");
   }
 }
@@ -38,7 +32,9 @@ export function pontuacaoDaFinalizacao(
     extreme: regras.pontosExtremeFinish,
   };
 
-  return pontuacoes[finalizacao];
+  const pontuacao = pontuacoes[finalizacao];
+  if (pontuacao === undefined) throw new RegraDeNegocioError("Tipo de finalização inválido.");
+  return pontuacao;
 }
 
 export interface Placar {
@@ -51,8 +47,12 @@ export function aplicarPonto(
   vencedor: "jogador1" | "jogador2",
   pontos: number,
 ): Placar {
-  if (!Number.isInteger(pontos) || pontos < 0) {
+  validarPlacar(placar);
+  if (!Number.isInteger(pontos) || !Number.isFinite(pontos) || pontos < 0) {
     throw new RegraDeNegocioError("A pontuação concedida deve ser um inteiro não negativo.");
+  }
+  if (vencedor !== "jogador1" && vencedor !== "jogador2") {
+    throw new RegraDeNegocioError("O vencedor precisa indicar jogador1 ou jogador2.");
   }
 
   return {
@@ -62,7 +62,18 @@ export function aplicarPonto(
 }
 
 export function partidaFoiVencida(placar: Placar, pontosParaVencer: number): boolean {
+  validarPlacar(placar);
+  if (!Number.isInteger(pontosParaVencer) || !Number.isFinite(pontosParaVencer) || pontosParaVencer <= 0) {
+    throw new RegraDeNegocioError("A pontuação para vencer deve ser um inteiro maior que zero.");
+  }
   return Math.max(placar.jogador1, placar.jogador2) >= pontosParaVencer;
+}
+
+export function validarPlacar(placar: Placar): void {
+  if (!Number.isInteger(placar.jogador1) || !Number.isFinite(placar.jogador1) || placar.jogador1 < 0 ||
+      !Number.isInteger(placar.jogador2) || !Number.isFinite(placar.jogador2) || placar.jogador2 < 0) {
+    throw new RegraDeNegocioError("O placar deve conter inteiros não negativos e finitos.");
+  }
 }
 
 export function validarVencedorDaBatalha(

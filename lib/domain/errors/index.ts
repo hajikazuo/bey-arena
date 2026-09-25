@@ -1,0 +1,1 @@
+export { RegraDeNegocioError } from "./RegraDeNegocioError";
