@@ -4,11 +4,10 @@ import { DashboardBreadcrumb } from "@/components/app-breadcrumb";
 import { ParticipantForm } from "@/components/torneios/participant-form";
 import { StartTournamentButton } from "@/components/torneios/start-tournament-button";
 import { TournamentBracket } from "@/components/torneios/bracket";
+import { TournamentInfoSheet } from "@/components/torneios/tournament-info-sheet";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   buscarTorneio,
@@ -62,6 +61,16 @@ export default async function TorneioDetalhesPage({
     ]),
   );
   const nomes = Object.fromEntries(nomesParticipantes);
+  const ranking = participantes
+    .map((participante) => ({
+      participanteId: participante.id,
+      nome: nomesParticipantes.get(participante.id) ?? participante.usuarioId,
+      pontos: partidas.reduce((total, partida) => (
+        total + (partida.jogador1_id === participante.id ? Number(partida.pontos_jogador1) : 0)
+          + (partida.jogador2_id === participante.id ? Number(partida.pontos_jogador2) : 0)
+      ), 0),
+    }))
+    .sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome));
 
   return (
     <div className="space-y-6">
@@ -76,7 +85,19 @@ export default async function TorneioDetalhesPage({
           </div>
         </div>
 
-        {podeIniciar && <StartTournamentButton torneioId={torneio.id} />}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <TournamentInfoSheet
+            participantes={participantes.map((participante) => ({
+              id: participante.id,
+              nome: nomesParticipantes.get(participante.id) ?? participante.usuarioId,
+              usuarioId: participante.usuarioId,
+              cabecaDeChave: participante.cabecaDeChave,
+            }))}
+            ranking={ranking}
+            exibirRanking={torneio.status === "finalizado"}
+          />
+          {podeIniciar && <StartTournamentButton torneioId={torneio.id} />}
+        </div>
       </div>
 
       {podeAdicionar && (
@@ -90,47 +111,6 @@ export default async function TorneioDetalhesPage({
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Participantes inscritos ({participantes.length})</CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-          {participantes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhum participante foi adicionado ainda.
-            </p>
-          ) : (
-            participantes.map((participante) => {
-              const nome =
-                participante.perfil?.apelido ||
-                participante.perfil?.nome ||
-                participante.usuarioId;
-
-              return (
-                <div
-                  key={participante.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
-                >
-                  <div>
-                    <p className="font-medium">{nome}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {participante.usuarioId}
-                    </p>
-                  </div>
-
-                  {participante.cabecaDeChave && (
-                    <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
-                      Seed {participante.cabecaDeChave}
-                    </span>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </CardContent>
-      </Card>
 
       {partidas.length > 0 && (
         <TournamentBracket

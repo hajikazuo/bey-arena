@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Check, ChevronRight, CircleHelp, LockKeyhole, Swords, Trophy } from "lucide-react";
+import { Check, ChevronRight, CircleHelp, LockKeyhole, Medal, Swords, Trophy } from "lucide-react";
 
 import { registrarResultadoPartida, type CriarTorneioState } from "@/app/(dashboard)/torneios/actions";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,12 @@ export type BatalhaVisual = {
   pontos_concedidos: number;
 };
 
+export type RankingItem = {
+  participanteId: string;
+  nome: string;
+  pontos: number;
+};
+
 const initialState: CriarTorneioState = { error: null, success: false };
 
 function nomeDoJogador(id: string | null, nomes: Record<string, string>) {
@@ -46,6 +52,7 @@ const tiposFinalizacao = [
 function PartidaCard({ partida, batalhas, nomes, podeEditar, emDestaque }: { partida: PartidaVisual; batalhas: BatalhaVisual[]; nomes: Record<string, string>; podeEditar: boolean; emDestaque: boolean }) {
   const [state, formAction, isPending] = useActionState(registrarResultadoPartida, initialState);
   const [toastKey, setToastKey] = useState(0);
+  const [tipoSelecionado, setTipoSelecionado] = useState("");
   const pronta = partida.status === "pronta" || partida.status === "em_andamento";
   const finalizada = partida.status === "finalizada";
   const editavel = podeEditar && pronta && !finalizada;
@@ -76,10 +83,23 @@ function PartidaCard({ partida, batalhas, nomes, podeEditar, emDestaque }: { par
               ))}
             </select>
             <label className="block text-xs font-medium text-foreground">Como venceu a batalha?</label>
-            <select name="tipoFinalizacao" required defaultValue="" className="h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm shadow-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30">
-              <option value="">Selecione a finalização</option>
-              {tiposFinalizacao.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
+            <input type="hidden" name="tipoFinalizacao" value={tipoSelecionado} />
+            <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Tipo de finalização">
+              {tiposFinalizacao.map(([value, label]) => {
+                const selecionado = tipoSelecionado === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={selecionado}
+                    onClick={() => setTipoSelecionado(value)}
+                    className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 ${selecionado ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-input bg-background hover:bg-muted"}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </>
         )}
         {[partida.jogador1_id, partida.jogador2_id].map((jogadorId, index) => (
@@ -164,6 +184,47 @@ export function TournamentBracket({ partidas, batalhas, nomes, podeEditar }: { p
             </div>
           </section>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function TournamentRanking({ ranking }: { ranking: RankingItem[] }) {
+  return (
+    <Card>
+      <CardHeader className="border-b bg-muted/20">
+        <div className="flex items-center gap-2">
+          <Medal className="size-5 text-primary" />
+          <div>
+            <CardTitle>Ranking do torneio</CardTitle>
+            <CardDescription>Classificação final por pontos conquistados nas partidas.</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y">
+          {ranking.map((item, index) => {
+            const colocacao = index > 0 && item.pontos === ranking[index - 1].pontos
+              ? index
+              : index + 1;
+            const destaque = colocacao <= 3;
+
+            return (
+              <div key={item.participanteId} className={`flex items-center gap-3 px-4 py-3 ${destaque ? "bg-primary/[0.03]" : ""}`}>
+                <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                  colocacao === 1 ? "bg-amber-400/20 text-amber-600" : colocacao === 2 ? "bg-slate-400/20 text-slate-600" : colocacao === 3 ? "bg-orange-400/20 text-orange-600" : "bg-muted text-muted-foreground"
+                }`}>
+                  {colocacao}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">{item.nome}</span>
+                <span className="text-right">
+                  <strong className="block text-lg tabular-nums">{item.pontos}</strong>
+                  <small className="text-xs text-muted-foreground">pontos</small>
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
