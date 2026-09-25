@@ -85,7 +85,7 @@ export async function listarPartidasDoTorneio(idTorneio: string) {
   const { data, error } = await supabase
     .from("partidas_torneios")
     .select(
-      "id, chave, rodada, posicao, jogador1_id, jogador2_id, status, pontos_jogador1, pontos_jogador2",
+      "id, chave, rodada, posicao, jogador1_id, jogador2_id, vencedor_id, status, pontos_jogador1, pontos_jogador2",
     )
     .eq("torneio_id", idTorneio)
     .order("rodada", { ascending: true })
@@ -101,5 +101,19 @@ export async function listarPartidasDoTorneio(idTorneio: string) {
   return {
     data: data ?? [],
     error: null,
+  };
+}
+
+export async function listarBatalhasDoTorneio(idTorneio: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("batalhas_partidas")
+    .select("id, partida_id, sequencia, vencedor_id, tipo_finalizacao, pontos_concedidos, partida:partidas_torneios!inner(torneio_id)")
+    .eq("partida.torneio_id", idTorneio)
+    .order("sequencia", { ascending: true });
+
+  return {
+    data: data ?? [],
+    error: error ? "Não foi possível carregar as pontuações." : null,
   };
 }

@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DashboardBreadcrumb } from "@/components/app-breadcrumb";
 import { ParticipantForm } from "@/components/torneios/participant-form";
 import { StartTournamentButton } from "@/components/torneios/start-tournament-button";
-import { Button } from "@/components/ui/button";
+import { TournamentBracket } from "@/components/torneios/bracket";
 import {
   Card,
   CardContent,
@@ -15,8 +14,10 @@ import {
   buscarTorneio,
   listarMembrosDisponiveis,
   listarPartidasDoTorneio,
+  listarBatalhasDoTorneio,
   listarParticipantesDoTorneio,
 } from "./queries";
+import { createClient } from "@/lib/supabase/server";
 
 const statusLabels = {
   rascunho: "Rascunho",
@@ -46,6 +47,9 @@ export default async function TorneioDetalhesPage({
     idsInscritos,
   );
   const { data: partidas, error: erroPartidas } = await listarPartidasDoTorneio(id);
+  const { data: batalhas, error: erroBatalhas } = await listarBatalhasDoTorneio(id);
+  const supabase = await createClient();
+  const { data: { user: usuarioAtual } } = await supabase.auth.getUser();
   const podeAdicionar =
     torneio.status === "rascunho" || torneio.status === "inscricoes";
   const podeIniciar = podeAdicionar && participantes.length >= 2;
@@ -57,6 +61,7 @@ export default async function TorneioDetalhesPage({
         participante.usuarioId,
     ]),
   );
+  const nomes = Object.fromEntries(nomesParticipantes);
 
   return (
     <div className="space-y-6">
@@ -78,10 +83,10 @@ export default async function TorneioDetalhesPage({
         <ParticipantForm torneioId={torneio.id} membros={membros} />
       )}
 
-      {(erroParticipantes || erroMembros || erroPartidas) && (
+      {(erroParticipantes || erroMembros || erroPartidas || erroBatalhas) && (
         <Card>
           <CardContent className="py-8 text-center text-sm text-destructive">
-            {erroParticipantes || erroMembros || erroPartidas}
+            {erroParticipantes || erroMembros || erroPartidas || erroBatalhas}
           </CardContent>
         </Card>
       )}
@@ -128,34 +133,12 @@ export default async function TorneioDetalhesPage({
       </Card>
 
       {partidas.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Chaveamento</CardTitle>
-          </CardHeader>
-
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            {partidas.map((partida) => (
-              <div
-                key={partida.id}
-                className="rounded-lg border p-3 text-sm"
-              >
-                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Rodada {partida.rodada} · Partida {partida.posicao}</span>
-                  <span>{partida.status}</span>
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <span>{nomesParticipantes.get(partida.jogador1_id ?? "") ?? "A definir"}</span>
-                  <strong>{partida.pontos_jogador1}</strong>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>{nomesParticipantes.get(partida.jogador2_id ?? "") ?? "A definir"}</span>
-                  <strong>{partida.pontos_jogador2}</strong>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <TournamentBracket
+          partidas={partidas}
+          batalhas={batalhas}
+          nomes={nomes}
+          podeEditar={usuarioAtual?.id === torneio.criadoPor}
+        />
       )}
     </div>
   );

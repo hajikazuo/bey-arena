@@ -147,3 +147,23 @@ create policy participantes_write_criador on public.participantes_torneios for a
 create policy partidas_select_membros on public.partidas_torneios for select to authenticated using (exists (select 1 from public.torneios t join public.membros_grupos mg on mg.grupo_id = t.grupo_id where t.id = torneio_id and mg.usuario_id = auth.uid()));
 create policy partidas_write_criador on public.partidas_torneios for all to authenticated using (exists (select 1 from public.torneios t where t.id = torneio_id and t.criado_por = auth.uid() and t.status not in ('finalizado', 'cancelado'))) with check (exists (select 1 from public.torneios t where t.id = torneio_id and t.criado_por = auth.uid()));
 create policy batalhas_select_membros on public.batalhas_partidas for select to authenticated using (exists (select 1 from public.partidas_torneios p join public.torneios t on t.id = p.torneio_id join public.membros_grupos mg on mg.grupo_id = t.grupo_id where p.id = partida_id and mg.usuario_id = auth.uid()));
+
+-- O dono do torneio pode registrar cada evento de pontuação da partida.
+create policy batalhas_insert_criador on public.batalhas_partidas
+for insert to authenticated
+with check (
+  exists (
+    select 1
+    from public.partidas_torneios p
+    join public.torneios t on t.id = p.torneio_id
+    where p.id = partida_id
+      and t.criado_por = auth.uid()
+      and t.status = 'em_andamento'
+  )
+  and exists (
+    select 1
+    from public.participantes_torneios pt
+    where pt.id = vencedor_id
+      and pt.torneio_id = (select torneio_id from public.partidas_torneios where id = partida_id)
+  )
+);

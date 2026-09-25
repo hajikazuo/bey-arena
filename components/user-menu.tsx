@@ -54,6 +54,7 @@ export function UserMenu({ email }: { email?: string | null }) {
             </Menu.Item>
             <form action={logout}>
               <Menu.Item
+                nativeButton
                 render={<button type="submit" />}
                 className="flex w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
               >

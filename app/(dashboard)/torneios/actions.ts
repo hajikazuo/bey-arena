@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import {
   EliminacaoDupla,
   EliminacaoSimples,
+  pontuacaoDaFinalizacao,
   validarRegrasTorneio,
 } from "@/lib/domain/torneio";
 import { createClient } from "@/lib/supabase/server";
@@ -369,6 +370,43 @@ export async function iniciarTorneio(
     };
   }
 
+  // Um BYE não precisa de placar: o único jogador disponível avança para a
+  // posição correspondente da próxima rodada.
+  for (const partida of partidas.filter((item) => item.status === "bye" && Boolean(item.jogador1_id || item.jogador2_id))) {
+    const vencedorId = partida.jogador1_id ?? partida.jogador2_id;
+    if (!vencedorId) continue;
+
+    await supabase
+      .from("partidas_torneios")
+      .update({ vencedor_id: vencedorId, finalizada_em: new Date().toISOString() })
+      .eq("id", partida.id);
+
+    const proximaRodada = partida.rodada + 1;
+    const proximaPosicao = Math.ceil(partida.posicao / 2);
+    const slot = partida.posicao % 2 === 1 ? "jogador1_id" : "jogador2_id";
+    const { data: existente } = await supabase
+      .from("partidas_torneios")
+      .select("id, jogador1_id, jogador2_id")
+      .eq("torneio_id", torneioId)
+      .eq("chave", partida.chave)
+      .eq("rodada", proximaRodada)
+      .eq("posicao", proximaPosicao)
+      .maybeSingle();
+
+    if (existente) {
+      const jogadores = { jogador1_id: existente.jogador1_id, jogador2_id: existente.jogador2_id, [slot]: vencedorId };
+      await supabase.from("partidas_torneios").update({ ...jogadores, status: jogadores.jogador1_id && jogadores.jogador2_id ? "pronta" : "pendente" }).eq("id", existente.id);
+    } else {
+      await supabase.from("partidas_torneios").insert({
+        id: crypto.randomUUID(), torneio_id: torneioId, chave: partida.chave,
+        rodada: proximaRodada, posicao: proximaPosicao,
+        jogador1_id: slot === "jogador1_id" ? vencedorId : null,
+        jogador2_id: slot === "jogador2_id" ? vencedorId : null,
+        status: "pendente",
+      });
+    }
+  }
+
   const { error: erroStatus } = await supabase
     .from("torneios")
     .update({
@@ -392,5 +430,162 @@ export async function iniciarTorneio(
   revalidatePath(`/torneios/${torneioId}`);
   revalidatePath("/torneios");
 
+  return { error: null, success: true };
+}
+
+export async function registrarResultadoPartida(
+  _previousState: CriarTorneioState,
+  formData: FormData,
+): Promise<CriarTorneioState> {
+  const partidaId = String(formData.get("partidaId") ?? "").trim();
+  const vencedorIdInformado = String(formData.get("vencedorId") ?? "").trim();
+  const tipoFinalizacao = String(formData.get("tipoFinalizacao") ?? "");
+
+  if (!partidaId) return { error: "Partida inválida.", success: false };
+  if (!vencedorIdInformado || !["spin", "over", "burst", "extreme"].includes(tipoFinalizacao)) {
+    return { error: "Selecione o jogador e o tipo de finalização.", success: false };
+  }
+
+  const { supabase, usuario } = await obterUsuario();
+  if (!usuario) return { error: "Sua sessão expirou. Entre novamente.", success: false };
+
+  const { data: partida, error: erroPartida } = await supabase
+    .from("partidas_torneios")
+    .select(
+      "id, torneio_id, chave, rodada, posicao, jogador1_id, jogador2_id, status, pontos_jogador1, pontos_jogador2, torneio:torneios(criado_por, status, pontos_para_vencer, pontos_spin_finish, pontos_over_finish, pontos_burst_finish, pontos_extreme_finish)",
+    )
+    .eq("id", partidaId)
+    .maybeSingle();
+
+  const torneio = Array.isArray(partida?.torneio) ? partida?.torneio[0] : partida?.torneio;
+  if (erroPartida || !partida || !torneio) {
+    return { error: "Partida não encontrada.", success: false };
+  }
+  if (torneio.criado_por !== usuario.id) {
+    return { error: "Somente o dono do torneio pode registrar o resultado.", success: false };
+  }
+  if (torneio.status !== "em_andamento") {
+    return { error: "Este torneio não está em andamento.", success: false };
+  }
+  if (partida.status === "finalizada" || partida.status === "bye") {
+    return { error: "Esta partida já foi encerrada.", success: false };
+  }
+  if (!partida.jogador1_id || !partida.jogador2_id) {
+    return { error: "A partida ainda não tem dois jogadores definidos.", success: false };
+  }
+  if (vencedorIdInformado !== partida.jogador1_id && vencedorIdInformado !== partida.jogador2_id) {
+    return { error: "O jogador selecionado não participa desta partida.", success: false };
+  }
+
+  const regras = {
+    pontosParaVencer: Number(torneio.pontos_para_vencer),
+    pontosSpinFinish: Number(torneio.pontos_spin_finish),
+    pontosOverFinish: Number(torneio.pontos_over_finish),
+    pontosBurstFinish: Number(torneio.pontos_burst_finish),
+    pontosExtremeFinish: Number(torneio.pontos_extreme_finish),
+  };
+  const pontosConcedidos = pontuacaoDaFinalizacao(tipoFinalizacao as "spin" | "over" | "burst" | "extreme", regras);
+  const vencedorId = vencedorIdInformado;
+  const perdedorId = vencedorId === partida.jogador1_id ? partida.jogador2_id : partida.jogador1_id;
+  const pontosJogador1 = Number(partida.pontos_jogador1) + (vencedorId === partida.jogador1_id ? pontosConcedidos : 0);
+  const pontosJogador2 = Number(partida.pontos_jogador2) + (vencedorId === partida.jogador2_id ? pontosConcedidos : 0);
+  const partidaEncerrada = Math.max(pontosJogador1, pontosJogador2) >= regras.pontosParaVencer;
+  const agora = new Date().toISOString();
+
+  const { data: ultimaBatalha } = await supabase
+    .from("batalhas_partidas")
+    .select("sequencia")
+    .eq("partida_id", partida.id)
+    .order("sequencia", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error: erroBatalha } = await supabase.from("batalhas_partidas").insert({
+    partida_id: partida.id,
+    sequencia: Number(ultimaBatalha?.sequencia ?? 0) + 1,
+    vencedor_id: vencedorId,
+    tipo_finalizacao: tipoFinalizacao,
+    pontos_concedidos: pontosConcedidos,
+  });
+  if (erroBatalha) {
+    console.error("Erro ao registrar pontuação:", erroBatalha);
+    return { error: "Não foi possível registrar a pontuação.", success: false };
+  }
+
+  const { error: erroAtualizacao } = await supabase
+    .from("partidas_torneios")
+    .update({
+      pontos_jogador1: pontosJogador1,
+      pontos_jogador2: pontosJogador2,
+      vencedor_id: vencedorId,
+      perdedor_id: perdedorId,
+      status: partidaEncerrada ? "finalizada" : "em_andamento",
+      finalizada_em: partidaEncerrada ? agora : null,
+    })
+    .eq("id", partida.id)
+    .eq("status", partida.status);
+
+  if (erroAtualizacao) {
+    console.error("Erro ao registrar resultado:", erroAtualizacao);
+    return { error: "Não foi possível registrar o resultado.", success: false };
+  }
+
+  if (!partidaEncerrada) {
+    revalidatePath(`/torneios/${partida.torneio_id}`);
+    return { error: null, success: true };
+  }
+
+  const { data: partidasRestantes } = await supabase
+    .from("partidas_torneios")
+    .select("id")
+    .eq("torneio_id", partida.torneio_id)
+    .not("status", "in", "(finalizada,bye)")
+    .neq("id", partida.id);
+
+  if (Number(partida.rodada) > 1 && (partidasRestantes ?? []).length === 0) {
+    await supabase
+      .from("torneios")
+      .update({ status: "finalizado", finalizado_em: agora, atualizado_em: agora })
+      .eq("id", partida.torneio_id)
+      .eq("status", "em_andamento");
+    revalidatePath(`/torneios/${partida.torneio_id}`);
+    revalidatePath("/torneios");
+    return { error: null, success: true };
+  }
+
+  const proximaRodada = Number(partida.rodada) + 1;
+  const proximaPosicao = Math.ceil(Number(partida.posicao) / 2);
+  const slot = Number(partida.posicao) % 2 === 1 ? "jogador1_id" : "jogador2_id";
+  const { data: proximaPartida } = await supabase
+    .from("partidas_torneios")
+    .select("id, jogador1_id, jogador2_id, status")
+    .eq("torneio_id", partida.torneio_id)
+    .eq("chave", partida.chave)
+    .eq("rodada", proximaRodada)
+    .eq("posicao", proximaPosicao)
+    .maybeSingle();
+
+  if (proximaPartida) {
+    const jogadores = {
+      jogador1_id: proximaPartida.jogador1_id,
+      jogador2_id: proximaPartida.jogador2_id,
+      [slot]: vencedorId,
+    };
+    const status = jogadores.jogador1_id && jogadores.jogador2_id ? "pronta" : "pendente";
+    await supabase.from("partidas_torneios").update({ ...jogadores, status }).eq("id", proximaPartida.id);
+  } else {
+    await supabase.from("partidas_torneios").insert({
+      id: crypto.randomUUID(),
+      torneio_id: partida.torneio_id,
+      chave: partida.chave,
+      rodada: proximaRodada,
+      posicao: proximaPosicao,
+      jogador1_id: slot === "jogador1_id" ? vencedorId : null,
+      jogador2_id: slot === "jogador2_id" ? vencedorId : null,
+      status: "pendente",
+    });
+  }
+
+  revalidatePath(`/torneios/${partida.torneio_id}`);
   return { error: null, success: true };
 }
