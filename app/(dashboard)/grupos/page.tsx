@@ -43,11 +43,11 @@ export default async function GruposPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex items-center justify-end gap-3">
-                <GroupForm grupo={{ id: grupo.id, nome: grupo.nome, descricao: grupo.descricao === "Sem descrição" ? null : grupo.descricao }} />
+                {(grupo.papel === "dono" || grupo.papel === "admin") && <GroupForm grupo={{ id: grupo.id, nome: grupo.nome, descricao: grupo.descricao === "Sem descrição" ? null : grupo.descricao }} />}
                 <Button nativeButton={false} variant="ghost" size="icon" render={<Link href={`/grupos/${grupo.id}/membros`} />} aria-label="Membros" title="Membros">
                   <UsersRound />
                 </Button>
-                <GrupoDeleteButton grupoId={grupo.id} />
+                {(grupo.papel === "dono" || grupo.papel === "admin") && <GrupoDeleteButton grupoId={grupo.id} />}
               </CardContent>
             </Card>
           ))}

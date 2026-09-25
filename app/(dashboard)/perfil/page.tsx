@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { DashboardBreadcrumb } from "@/components/app-breadcrumb";
-import { ProfileForm } from "@/components/profile-form";
+import { ProfileForm } from "@/components/perfil/profile-form";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function PerfilPage() {
@@ -27,7 +27,7 @@ export default async function PerfilPage() {
           <p className="text-sm text-muted-foreground">Gerencie seus dados pessoais e sua senha.</p>
         </div>
       </div>
-      <ProfileForm email={user.email ?? ""} nome={nome} apelido={perfil?.apelido ?? ""} />
+      <ProfileForm idUsuario={user.id} email={user.email ?? ""} nome={nome} apelido={perfil?.apelido ?? ""} />
     </div>
   );
 }

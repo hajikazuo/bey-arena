@@ -8,10 +8,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { GlobalToast } from "@/components/ui/global-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Check, Copy } from "lucide-react";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 const initialState: PerfilState = { error: null, success: null, toastKey: null };
 
-export function ProfileForm({ email, nome, apelido }: { email: string; nome: string; apelido: string }) {
+export function ProfileForm({ idUsuario, email, nome, apelido }: { idUsuario: string; email: string; nome: string; apelido: string }) {
+  const { copyToClipboard, isCopied } = useCopyToClipboard()
   const [profileState, profileAction, isProfilePending] = useActionState(editarPerfil, initialState);
   const [passwordState, passwordAction, isPasswordPending] = useActionState(editarSenha, initialState);
   const [showPassword, setShowPassword] = useState(false);
@@ -24,6 +28,25 @@ export function ProfileForm({ email, nome, apelido }: { email: string; nome: str
       <GlobalToast message={passwordState.error} type="error" toastKey={passwordState.toastKey} />
       <GlobalToast message={passwordState.success} type="success" toastKey={passwordState.toastKey} />
       <div className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid w-full gap-2 md:col-span-2">
+          <Label htmlFor="idUsuario">ID do usuário</Label>
+          <InputGroup>
+            <InputGroupInput id="idUsuario" value={idUsuario} readOnly aria-label="ID do usuário" />
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                aria-label="Copy"
+                title="Copy"
+                size="icon-xs"
+                onClick={() => {
+                  copyToClipboard(idUsuario)
+                }}
+              >
+                {isCopied ? <Check /> : <Copy />}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+        </div>
+
         <form action={profileAction}>
           <Card>
             <CardHeader><CardTitle>Dados do perfil</CardTitle><CardDescription>Atualize as informações que aparecem na sua conta.</CardDescription></CardHeader>
