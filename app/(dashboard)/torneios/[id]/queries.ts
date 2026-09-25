@@ -78,3 +78,28 @@ export async function listarMembrosDisponiveis(
     error: null,
   };
 }
+
+export async function listarPartidasDoTorneio(idTorneio: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("partidas_torneios")
+    .select(
+      "id, chave, rodada, posicao, jogador1_id, jogador2_id, status, pontos_jogador1, pontos_jogador2",
+    )
+    .eq("torneio_id", idTorneio)
+    .order("rodada", { ascending: true })
+    .order("posicao", { ascending: true });
+
+  if (error) {
+    return {
+      data: [],
+      error: "Não foi possível carregar as partidas do torneio.",
+    };
+  }
+
+  return {
+    data: data ?? [],
+    error: null,
+  };
+}

@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  HelpCircle,
   LayoutDashboard,
   Swords,
   UsersRound,
@@ -32,6 +33,11 @@ const items = [
     title: "Torneios",
     url: "/torneios",
     icon: Swords,
+  },
+  {
+    title: "Faq",
+    url: "/faq",
+    icon: HelpCircle,
   },
 ]
 

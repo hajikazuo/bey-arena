@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { validarRegrasTorneio } from "@/lib/domain/torneio";
+import {
+  EliminacaoDupla,
+  EliminacaoSimples,
+  validarRegrasTorneio,
+} from "@/lib/domain/torneio";
 import { createClient } from "@/lib/supabase/server";
 import type { FormatoTorneio, RegrasTorneio } from "@/types/torneio";
 
@@ -207,7 +211,186 @@ export async function adicionarParticipantes(
     };
   }
 
+  if (torneio.status === "rascunho") {
+    const { error: erroStatus } = await supabase
+      .from("torneios")
+      .update({
+        status: "inscricoes",
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", torneioId)
+      .eq("status", "rascunho");
+
+    if (erroStatus) {
+      console.error("Erro ao atualizar status do torneio:", erroStatus);
+
+      return {
+        error:
+          "Os participantes foram adicionados, mas não foi possível atualizar o status do torneio.",
+        success: false,
+      };
+    }
+  }
+
   revalidatePath(`/torneios/${torneioId}`);
+  revalidatePath("/torneios");
+
+  return { error: null, success: true };
+}
+
+export async function iniciarTorneio(
+  _previousState: CriarTorneioState,
+  formData: FormData,
+): Promise<CriarTorneioState> {
+  const torneioId = String(formData.get("torneioId") ?? "").trim();
+
+  if (!torneioId) {
+    return { error: "Torneio inválido.", success: false };
+  }
+
+  const { supabase, usuario } = await obterUsuario();
+
+  if (!usuario) {
+    return {
+      error: "Sua sessão expirou. Entre novamente para iniciar o torneio.",
+      success: false,
+    };
+  }
+
+  const { data: torneio, error: erroTorneio } = await supabase
+    .from("torneios")
+    .select("id, formato, criado_por, status")
+    .eq("id", torneioId)
+    .maybeSingle();
+
+  if (erroTorneio || !torneio) {
+    return { error: "Torneio não encontrado.", success: false };
+  }
+
+  if (torneio.criado_por !== usuario.id) {
+    return {
+      error: "Somente o dono do torneio pode iniciá-lo.",
+      success: false,
+    };
+  }
+
+  if (torneio.status !== "rascunho" && torneio.status !== "inscricoes") {
+    return {
+      error: "Este torneio não pode ser iniciado no status atual.",
+      success: false,
+    };
+  }
+
+  const { data: participantes, error: erroParticipantes } = await supabase
+    .from("participantes_torneios")
+    .select("id, cabeca_de_chave")
+    .eq("torneio_id", torneioId)
+    .order("criado_em", { ascending: true });
+
+  if (erroParticipantes) {
+    return {
+      error: "Não foi possível carregar os participantes do torneio.",
+      success: false,
+    };
+  }
+
+  if ((participantes ?? []).length < 2) {
+    return {
+      error: "Adicione pelo menos dois participantes antes de iniciar o torneio.",
+      success: false,
+    };
+  }
+
+  const { data: partidasExistentes, error: erroPartidas } = await supabase
+    .from("partidas_torneios")
+    .select("id")
+    .eq("torneio_id", torneioId)
+    .limit(1);
+
+  if (erroPartidas) {
+    return {
+      error: "Não foi possível verificar o chaveamento existente.",
+      success: false,
+    };
+  }
+
+  if ((partidasExistentes ?? []).length > 0) {
+    return {
+      error: "O chaveamento deste torneio já foi gerado.",
+      success: false,
+    };
+  }
+
+  const participantesParaChaveamento = (participantes ?? []).map((participante) => ({
+    id: participante.id,
+    cabecaDeChave: participante.cabeca_de_chave ?? undefined,
+  }));
+
+  let chaveamento;
+
+  try {
+    const gerador =
+      torneio.formato === "eliminacao_simples"
+        ? new EliminacaoSimples()
+        : new EliminacaoDupla();
+
+    chaveamento = gerador.gerar(participantesParaChaveamento);
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar o chaveamento.",
+      success: false,
+    };
+  }
+
+  const partidas = chaveamento.partidas.map((partida) => ({
+    id: crypto.randomUUID(),
+    torneio_id: torneioId,
+    chave: partida.chave,
+    rodada: partida.rodada,
+    posicao: partida.posicao,
+    jogador1_id: partida.jogador1Id ?? null,
+    jogador2_id: partida.jogador2Id ?? null,
+    status: partida.status,
+  }));
+
+  const { error: erroInsercao } = await supabase
+    .from("partidas_torneios")
+    .insert(partidas);
+
+  if (erroInsercao) {
+    console.error("Erro ao gerar partidas do torneio:", erroInsercao);
+
+    return {
+      error: "Não foi possível salvar o chaveamento do torneio.",
+      success: false,
+    };
+  }
+
+  const { error: erroStatus } = await supabase
+    .from("torneios")
+    .update({
+      status: "em_andamento",
+      iniciado_em: new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
+    })
+    .eq("id", torneioId)
+    .eq("status", torneio.status);
+
+  if (erroStatus) {
+    console.error("Erro ao atualizar status do torneio:", erroStatus);
+
+    return {
+      error:
+        "O chaveamento foi criado, mas não foi possível atualizar o status do torneio.",
+      success: false,
+    };
+  }
+
+  revalidatePath(`/torneios/${torneioId}`);
+  revalidatePath("/torneios");
 
   return { error: null, success: true };
 }

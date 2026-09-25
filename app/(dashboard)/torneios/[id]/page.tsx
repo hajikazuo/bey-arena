@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { DashboardBreadcrumb } from "@/components/app-breadcrumb";
 import { ParticipantForm } from "@/components/torneios/participant-form";
+import { StartTournamentButton } from "@/components/torneios/start-tournament-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +14,7 @@ import {
 import {
   buscarTorneio,
   listarMembrosDisponiveis,
+  listarPartidasDoTorneio,
   listarParticipantesDoTorneio,
 } from "./queries";
 
@@ -43,8 +45,18 @@ export default async function TorneioDetalhesPage({
     torneio.grupoId,
     idsInscritos,
   );
+  const { data: partidas, error: erroPartidas } = await listarPartidasDoTorneio(id);
   const podeAdicionar =
     torneio.status === "rascunho" || torneio.status === "inscricoes";
+  const podeIniciar = podeAdicionar && participantes.length >= 2;
+  const nomesParticipantes = new Map(
+    participantes.map((participante) => [
+      participante.id,
+      participante.perfil?.apelido ||
+        participante.perfil?.nome ||
+        participante.usuarioId,
+    ]),
+  );
 
   return (
     <div className="space-y-6">
@@ -59,23 +71,17 @@ export default async function TorneioDetalhesPage({
           </div>
         </div>
 
-        <Button
-          nativeButton={false}
-          variant="outline"
-          render={<Link href="/torneios" />}
-        >
-          Voltar para torneios
-        </Button>
+        {podeIniciar && <StartTournamentButton torneioId={torneio.id} />}
       </div>
 
       {podeAdicionar && (
         <ParticipantForm torneioId={torneio.id} membros={membros} />
       )}
 
-      {(erroParticipantes || erroMembros) && (
+      {(erroParticipantes || erroMembros || erroPartidas) && (
         <Card>
           <CardContent className="py-8 text-center text-sm text-destructive">
-            {erroParticipantes || erroMembros}
+            {erroParticipantes || erroMembros || erroPartidas}
           </CardContent>
         </Card>
       )}
@@ -120,6 +126,37 @@ export default async function TorneioDetalhesPage({
           )}
         </CardContent>
       </Card>
+
+      {partidas.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Chaveamento</CardTitle>
+          </CardHeader>
+
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {partidas.map((partida) => (
+              <div
+                key={partida.id}
+                className="rounded-lg border p-3 text-sm"
+              >
+                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Rodada {partida.rodada} · Partida {partida.posicao}</span>
+                  <span>{partida.status}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span>{nomesParticipantes.get(partida.jogador1_id ?? "") ?? "A definir"}</span>
+                  <strong>{partida.pontos_jogador1}</strong>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>{nomesParticipantes.get(partida.jogador2_id ?? "") ?? "A definir"}</span>
+                  <strong>{partida.pontos_jogador2}</strong>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
