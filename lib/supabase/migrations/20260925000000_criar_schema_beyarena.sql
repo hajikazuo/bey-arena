@@ -91,17 +91,53 @@ alter table public.participantes_torneios enable row level security;
 alter table public.partidas_torneios enable row level security;
 alter table public.batalhas_partidas enable row level security;
 
+create or replace function public.usuario_membro_grupo(id_grupo uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.membros_grupos mg
+    where mg.grupo_id = id_grupo
+      and mg.usuario_id = auth.uid()
+  );
+$$;
+
+create or replace function public.usuario_admin_grupo(id_grupo uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.grupos g
+    where g.id = id_grupo
+      and g.criado_por = auth.uid()
+  ) or exists (
+    select 1
+    from public.membros_grupos mg
+    where mg.grupo_id = id_grupo
+      and mg.usuario_id = auth.uid()
+      and mg.papel in ('dono', 'admin')
+  );
+$$;
+
 create policy perfis_select_autenticados on public.perfis_usuarios for select to authenticated using (true);
 create policy perfil_insert_proprio on public.perfis_usuarios for insert to authenticated with check (id = auth.uid());
 create policy perfil_update_proprio on public.perfis_usuarios for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
-create policy grupos_select_membros on public.grupos for select to authenticated using (exists (select 1 from public.membros_grupos mg where mg.grupo_id = grupos.id and mg.usuario_id = auth.uid()));
+create policy grupos_select_membros on public.grupos for select to authenticated using (criado_por = auth.uid() or public.usuario_membro_grupo(id));
 create policy grupos_insert_proprio on public.grupos for insert to authenticated with check (criado_por = auth.uid());
 create policy grupos_update_administradores on public.grupos for update to authenticated using (exists (select 1 from public.membros_grupos mg where mg.grupo_id = grupos.id and mg.usuario_id = auth.uid() and mg.papel in ('dono', 'admin')));
 create policy grupos_delete_dono on public.grupos for delete to authenticated using (exists (select 1 from public.membros_grupos mg where mg.grupo_id = grupos.id and mg.usuario_id = auth.uid() and mg.papel = 'dono'));
-create policy membros_select_proprios on public.membros_grupos for select to authenticated using (usuario_id = auth.uid());
-create policy membros_insert_proprios on public.membros_grupos for insert to authenticated with check (usuario_id = auth.uid());
-create policy membros_update_proprios on public.membros_grupos for update to authenticated using (usuario_id = auth.uid()) with check (usuario_id = auth.uid() and papel <> 'dono');
-create policy membros_delete_proprios on public.membros_grupos for delete to authenticated using (usuario_id = auth.uid() and papel <> 'dono');
+create policy membros_select_grupo on public.membros_grupos for select to authenticated using (usuario_id = auth.uid() or public.usuario_admin_grupo(grupo_id));
+create policy membros_insert_grupo on public.membros_grupos for insert to authenticated with check (public.usuario_admin_grupo(grupo_id));
+create policy membros_update_grupo on public.membros_grupos for update to authenticated using (public.usuario_admin_grupo(grupo_id) and papel <> 'dono') with check (papel <> 'dono');
+create policy membros_delete_grupo on public.membros_grupos for delete to authenticated using (public.usuario_admin_grupo(grupo_id) and papel <> 'dono');
 create policy torneios_select_membros on public.torneios for select to authenticated using (exists (select 1 from public.membros_grupos mg where mg.grupo_id = grupo_id and mg.usuario_id = auth.uid()));
 create policy torneios_insert_membros on public.torneios for insert to authenticated with check (criado_por = auth.uid() and exists (select 1 from public.membros_grupos mg where mg.grupo_id = torneios.grupo_id and mg.usuario_id = auth.uid()));
 create policy torneios_update_criador on public.torneios for update to authenticated using (criado_por = auth.uid() and status not in ('finalizado', 'cancelado')) with check (criado_por = auth.uid());

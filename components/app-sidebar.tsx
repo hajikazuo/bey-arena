@@ -2,11 +2,7 @@
 
 import {
   LayoutDashboard,
-  Tags,
   UsersRound,
-  ArrowLeftRight,
-  ArrowUpCircle,
-  ArrowDownCircle,
 } from "lucide-react"
 import {
   Sidebar,
@@ -25,26 +21,6 @@ const items = [
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboard,
-  },
-   {
-    title: "Transações",
-    url: "/transacoes",
-    icon: ArrowLeftRight,
-  },
-  {
-    title: "Receitas",
-    url: "/transacoes?tipo=receita",
-    icon: ArrowUpCircle,
-  },
-  {
-    title: "Despesas",
-    url: "/transacoes?tipo=despesa",
-    icon: ArrowDownCircle,
-  },
-  {
-    title: "Categorias",
-    url: "/categorias",
-    icon: Tags,
   },
   {
     title: "Grupos",

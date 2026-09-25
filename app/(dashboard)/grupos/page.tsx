@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listarGrupos } from "./queries";
 import { GrupoDeleteButton } from "@/components/grupos/group-delete-button";
-import { Pencil } from "lucide-react";
+import { Pencil, UsersRound } from "lucide-react";
 
 export default async function GruposPage() {
   const { data: grupos, error } = await listarGrupos();
@@ -45,6 +45,9 @@ export default async function GruposPage() {
               <CardContent className="flex items-center justify-end gap-3">
                 <Button nativeButton={false} variant="ghost" size="icon" render={<Link href={`/grupos/${grupo.id}/editar`} />}>
                   <Pencil />
+                </Button>
+                <Button nativeButton={false} variant="ghost" size="icon" render={<Link href={`/grupos/${grupo.id}/membros`} />} aria-label="Membros" title="Membros">
+                  <UsersRound />
                 </Button>
                 <GrupoDeleteButton grupoId={grupo.id} />
               </CardContent>
