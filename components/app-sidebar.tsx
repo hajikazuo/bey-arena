@@ -3,6 +3,7 @@
 import {
   LayoutDashboard,
   Tags,
+  UsersRound,
   ArrowLeftRight,
   ArrowUpCircle,
   ArrowDownCircle,
@@ -44,6 +45,11 @@ const items = [
     title: "Categorias",
     url: "/categorias",
     icon: Tags,
+  },
+  {
+    title: "Grupos",
+    url: "/grupos",
+    icon: UsersRound,
   },
 ]
 
