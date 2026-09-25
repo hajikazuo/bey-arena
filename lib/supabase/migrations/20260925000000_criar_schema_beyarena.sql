@@ -134,7 +134,7 @@ create policy grupos_select_membros on public.grupos for select to authenticated
 create policy grupos_insert_proprio on public.grupos for insert to authenticated with check (criado_por = auth.uid());
 create policy grupos_update_administradores on public.grupos for update to authenticated using (exists (select 1 from public.membros_grupos mg where mg.grupo_id = grupos.id and mg.usuario_id = auth.uid() and mg.papel in ('dono', 'admin')));
 create policy grupos_delete_dono on public.grupos for delete to authenticated using (exists (select 1 from public.membros_grupos mg where mg.grupo_id = grupos.id and mg.usuario_id = auth.uid() and mg.papel = 'dono'));
-create policy membros_select_grupo on public.membros_grupos for select to authenticated using (usuario_id = auth.uid() or public.usuario_admin_grupo(grupo_id));
+create policy membros_select_grupo on public.membros_grupos for select to authenticated using (public.usuario_membro_grupo(grupo_id));
 create policy membros_insert_grupo on public.membros_grupos for insert to authenticated with check (public.usuario_admin_grupo(grupo_id));
 create policy membros_update_grupo on public.membros_grupos for update to authenticated using (public.usuario_admin_grupo(grupo_id) and papel <> 'dono') with check (papel <> 'dono');
 create policy membros_delete_grupo on public.membros_grupos for delete to authenticated using (public.usuario_admin_grupo(grupo_id) and papel <> 'dono');

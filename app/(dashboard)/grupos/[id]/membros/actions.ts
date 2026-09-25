@@ -9,11 +9,15 @@ const papeis: PapelMembroGrupo[] = ["admin", "membro"];
 
 async function obterUsuario() {
   const supabase = await createClient();
-  const { data: { user: usuario } } = await supabase.auth.getUser();
+  const {
+    data: { user: usuario },
+  } = await supabase.auth.getUser();
   return { supabase, usuario };
 }
 
-function lerId(valor: FormDataEntryValue | null) { return String(valor ?? "").trim(); }
+function lerId(valor: FormDataEntryValue | null) {
+  return String(valor ?? "").trim();
+}
 
 export async function adicionarMembro(
   _previousState: MembroGrupoState,
@@ -22,19 +26,25 @@ export async function adicionarMembro(
   const idGrupo = lerId(formData.get("grupoId"));
   const idUsuario = lerId(formData.get("usuarioId"));
   const papel = String(formData.get("papel") ?? "membro") as PapelMembroGrupo;
+
   if (!idGrupo || !idUsuario)
     return { error: "Informe o grupo e o usuário.", success: false };
+
   if (!papeis.includes(papel))
     return { error: "Selecione um papel válido.", success: false };
+
   const { supabase, usuario } = await obterUsuario();
+
   if (!usuario)
     return {
       error: "Sua sessão expirou. Faça login novamente.",
       success: false,
     };
+
   const { error } = await supabase
     .from("membros_grupos")
     .insert({ grupo_id: idGrupo, usuario_id: idUsuario, papel });
+
   if (error)
     return {
       error:
@@ -43,6 +53,7 @@ export async function adicionarMembro(
           : "Não foi possível adicionar o membro.",
       success: false,
     };
+
   revalidatePath(`/grupos/${idGrupo}/membros`);
   return { error: null, success: true };
 }
@@ -56,12 +67,15 @@ export async function editarMembro(
   const papel = String(formData.get("papel") ?? "") as PapelMembroGrupo;
   if (!idGrupo || !idMembro || !papeis.includes(papel))
     return { error: "Dados do membro inválidos.", success: false };
+
   const { supabase, usuario } = await obterUsuario();
+
   if (!usuario)
     return {
       error: "Sua sessão expirou. Faça login novamente.",
       success: false,
     };
+
   const { data, error } = await supabase
     .from("membros_grupos")
     .update({ papel })
@@ -69,11 +83,13 @@ export async function editarMembro(
     .eq("grupo_id", idGrupo)
     .select("id")
     .maybeSingle();
+
   if (error)
     return {
       error: "Não foi possível alterar o papel do membro.",
       success: false,
     };
+
   if (!data)
     return { error: "Membro não encontrado ou sem permissão.", success: false };
   revalidatePath(`/grupos/${idGrupo}/membros`);
@@ -87,12 +103,15 @@ export async function removerMembro(
   const id = idMembro.trim();
   if (!id || !idGrupo.trim())
     return { error: "Membro inválido.", success: false };
+
   const { supabase, usuario } = await obterUsuario();
+
   if (!usuario)
     return {
       error: "Sua sessão expirou. Faça login novamente.",
       success: false,
     };
+
   const { data, error } = await supabase
     .from("membros_grupos")
     .delete()
@@ -100,11 +119,13 @@ export async function removerMembro(
     .eq("grupo_id", idGrupo)
     .select("id")
     .maybeSingle();
+
   if (error)
     return { error: "Não foi possível remover o membro.", success: false };
+
   if (!data)
     return { error: "Membro não encontrado ou sem permissão.", success: false };
+
   revalidatePath(`/grupos/${idGrupo}/membros`);
   return { error: null, success: true };
 }
-

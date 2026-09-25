@@ -2,6 +2,7 @@
 
 import {
   LayoutDashboard,
+  Swords,
   UsersRound,
 } from "lucide-react"
 import {
@@ -26,6 +27,11 @@ const items = [
     title: "Grupos",
     url: "/grupos",
     icon: UsersRound,
+  },
+  {
+    title: "Torneios",
+    url: "/torneios",
+    icon: Swords,
   },
 ]
 
