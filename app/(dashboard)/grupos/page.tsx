@@ -1,11 +1,11 @@
-import Link from "next/link";
-
 import { DashboardBreadcrumb } from "@/components/app-breadcrumb";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listarGrupos } from "./queries";
 import { GrupoDeleteButton } from "@/components/grupos/group-delete-button";
-import { Pencil, UsersRound } from "lucide-react";
+import { GroupForm } from "@/components/grupos/group-form";
+import { UsersRound } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default async function GruposPage() {
   const { data: grupos, error } = await listarGrupos();
@@ -15,7 +15,7 @@ export default async function GruposPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2"><DashboardBreadcrumb title="Grupos" /><div><h1 className="text-2xl font-semibold tracking-tight">Grupos</h1><p className="text-sm text-muted-foreground">Organize seus torneios e participantes.</p></div></div>
-        <Button nativeButton={false} render={<Link href="/grupos/novo" />}>Novo grupo</Button>
+        <GroupForm />
       </div>
 
       {error ? (
@@ -43,9 +43,7 @@ export default async function GruposPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex items-center justify-end gap-3">
-                <Button nativeButton={false} variant="ghost" size="icon" render={<Link href={`/grupos/${grupo.id}/editar`} />}>
-                  <Pencil />
-                </Button>
+                <GroupForm grupo={{ id: grupo.id, nome: grupo.nome, descricao: grupo.descricao === "Sem descrição" ? null : grupo.descricao }} />
                 <Button nativeButton={false} variant="ghost" size="icon" render={<Link href={`/grupos/${grupo.id}/membros`} />} aria-label="Membros" title="Membros">
                   <UsersRound />
                 </Button>

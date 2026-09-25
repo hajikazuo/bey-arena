@@ -91,7 +91,6 @@ export async function editarGrupo(_previousState: CriarGrupoState, formData: For
   if (!data) return { error: "Grupo não encontrado ou sem permissão para editá-lo.", success: false };
 
   revalidatePath("/grupos");
-  revalidatePath(`/grupos/${idGrupo}/editar`);
   return { error: null, success: true };
 }
 
