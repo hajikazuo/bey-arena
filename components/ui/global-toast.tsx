@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/toast";
 type GlobalToastProps = {
   message: string | null;
   type?: "error" | "success" | "info" | "warning";
-  toastKey?: string | number;
+  toastKey?: string | number | null;
 };
 
 export function GlobalToast({ message, type = "info", toastKey }: GlobalToastProps) {
